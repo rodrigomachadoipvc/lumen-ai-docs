@@ -76,3 +76,10 @@ def test_detect_language() -> None:
     assert detect_language(portuguese) == "portuguese"
     assert detect_language(english) == "english"
     assert detect_language("12345 67890") == "simple"
+
+
+def test_detect_language_of_short_questions() -> None:
+    assert detect_language("How many vacation days do I get?") == "english"
+    assert detect_language("Who should I contact if my laptop is stolen?") == "english"
+    assert detect_language("Quantos dias por semana posso estar em teletrabalho?") == "portuguese"
+    assert detect_language("E qual é a compensação mensal?") == "portuguese"

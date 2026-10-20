@@ -2,15 +2,18 @@
 
 import re
 
-# Small stopword samples are enough to tell these languages apart on a few thousand characters.
+# Common words that exist in only one of the two languages. Words spelled the same in both
+# ("a", "do", "as", "no", "me") are left out, so short questions are not misread.
 _STOPWORDS: dict[str, frozenset[str]] = {
     "portuguese": frozenset(
-        "a o os as de do da dos das em no na nos nas um uma que não para com por se ao "
-        "à é são foi mais como mas ou seu sua pelo pela entre também".split()
+        "o os da dos das em na nos nas um uma que não para com por se ao à é são foi está "
+        "mais como mas ou seu sua pelo pela entre também qual quais quanto quantos quantas "
+        "quem onde quando porque posso pode tenho há eu meu minha".split()
     ),
     "english": frozenset(
-        "the of and to in is are was were for on with as by that this it be at from or "
-        "an not which have has but their".split()
+        "the of and to in is are was were for on with by that this it be at from or an "
+        "not which have has but their how what who when where why does did you your my "
+        "can many much get i we they there".split()
     ),
 }
 
