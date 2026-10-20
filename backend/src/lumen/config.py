@@ -11,7 +11,8 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="LUMEN_",
-        env_file=".env",
+        # Repository-root `.env` (shared with docker compose), then an optional backend override.
+        env_file=("../.env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
