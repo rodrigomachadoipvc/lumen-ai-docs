@@ -1,0 +1,7 @@
+extend = "../backend/pyproject.toml"
+
+[lint.isort]
+known-first-party = ["lumen", "evals"]
+
+[lint.per-file-ignores]
+"test_*.py" = ["S101"]
