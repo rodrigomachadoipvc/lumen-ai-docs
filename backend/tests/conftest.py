@@ -15,7 +15,7 @@ from testcontainers.community.postgres import PostgresContainer
 from lumen.config import Settings
 from lumen.container import Container
 from lumen.main import create_app
-from tests.fakes import FakeEmbeddings
+from tests.fakes import FakeChat, FakeEmbeddings
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 POSTGRES_IMAGE = "pgvector/pgvector:0.8.7-pg18"
@@ -51,13 +51,20 @@ def embedder() -> FakeEmbeddings:
 
 
 @pytest.fixture
-async def app(settings: Settings, embedder: FakeEmbeddings) -> AsyncIterator[FastAPI]:
-    application = create_app(settings, embedder=embedder)
+def chat() -> FakeChat:
+    return FakeChat()
+
+
+@pytest.fixture
+async def app(
+    settings: Settings, embedder: FakeEmbeddings, chat: FakeChat
+) -> AsyncIterator[FastAPI]:
+    application = create_app(settings, embedder=embedder, chat=chat)
     async with application.router.lifespan_context(application):
         yield application
     engine = create_async_engine(settings.database_url)
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE documents CASCADE"))
+        await conn.execute(text("TRUNCATE documents, chats CASCADE"))
     await engine.dispose()
 
 
