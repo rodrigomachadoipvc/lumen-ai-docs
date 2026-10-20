@@ -28,7 +28,7 @@ starting any milestone.
 | --- | --- |
 | Backend | Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2 (async), Alembic |
 | Package tooling | `uv` (Python), `pnpm` (Node) |
-| Database | PostgreSQL 16+ with `pgvector` (HNSW index) and built-in full-text search |
+| Database | PostgreSQL 18 with `pgvector` (HNSW index) and built-in full-text search |
 | LLM and embeddings | Provider interface with adapters: Anthropic (Claude), OpenAI, Ollama (local, default for dev) |
 | Agent | Own tool-calling loop on top of the provider interface; no heavy framework |
 | MCP | Official MCP Python SDK (`mcp`), stdio and Streamable HTTP transports |
@@ -58,12 +58,17 @@ data/samples/   small public-domain demo documents
 Keep this section up to date as commands are added.
 
 ```bash
-docker compose up -d            # postgres (+pgvector), optional ollama, langfuse
+docker compose up -d                       # postgres 18 + pgvector on :5432
+docker compose --profile ollama up -d      # + Ollama container on :11435 (native Ollama uses :11434)
+docker compose --profile langfuse up -d    # + Langfuse v4 on :3001
 cd backend && uv sync && uv run pytest
-cd backend && uv run ruff check . && uv run mypy src
-cd backend && uv run alembic upgrade head
-cd frontend && pnpm install && pnpm dev
-cd frontend && pnpm lint && pnpm test && pnpm exec playwright test
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy
+cd backend && uv run fastapi dev src/lumen/main.py   # API on :8000
+cd frontend && pnpm install && pnpm dev               # web on :3000
+cd frontend && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test
+pre-commit run --all-files                 # all hooks (install: uv tool install pre-commit)
+# From M1: cd backend && uv run alembic upgrade head
+# From M5: cd frontend && pnpm exec playwright test
 ```
 
 ## Rules for code
