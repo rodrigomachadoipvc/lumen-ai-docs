@@ -3,10 +3,12 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -17,7 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from lumen.config import EMBEDDING_DIMENSIONS
@@ -103,3 +105,50 @@ class Chunk(Base):
     tsv: Mapped[str] = mapped_column(TSVECTOR)
 
     document: Mapped[Document] = relationship(back_populates="chunks")
+
+
+class MessageRole(enum.StrEnum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class Chat(Base):
+    __tablename__ = "chats"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    title: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    messages: Mapped[list[Message]] = relationship(
+        back_populates="chat",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="Message.created_at",
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    chat_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chats.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[MessageRole] = mapped_column(
+        Enum(MessageRole, name="message_role", values_callable=_enum_values)
+    )
+    content: Mapped[str] = mapped_column(Text)
+    # Assistant only: the passages shown to the model and the ones its answer cites.
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    citations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    # Assistant only: agent tool calls, in order (see the agent mode).
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    grounded: Mapped[bool | None] = mapped_column(Boolean)
+    model: Mapped[str | None] = mapped_column(String(128))
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    chat: Mapped[Chat] = relationship(back_populates="messages")
