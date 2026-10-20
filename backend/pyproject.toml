@@ -10,6 +10,7 @@ requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.156.1",
     "pydantic-settings>=2.16.1",
+    "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
 ]
 

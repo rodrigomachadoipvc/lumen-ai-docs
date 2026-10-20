@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     app_name: str = "Lumen API"
     environment: Literal["local", "test", "production"] = "local"
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    log_json: bool = True
 
 
 @lru_cache
