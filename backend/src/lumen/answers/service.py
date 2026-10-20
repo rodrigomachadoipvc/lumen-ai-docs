@@ -43,7 +43,12 @@ class DoneEvent:
     steps: list[dict[str, Any]] = field(default_factory=list)
 
 
-AnswerEvent = SourcesEvent | DeltaEvent | StepEvent | DoneEvent
+@dataclass(frozen=True)
+class ResetEvent:
+    """Text streamed during an agent step that turned out to be a tool call; discard it."""
+
+
+AnswerEvent = SourcesEvent | DeltaEvent | StepEvent | ResetEvent | DoneEvent
 
 
 def not_found_message(question: str) -> str:

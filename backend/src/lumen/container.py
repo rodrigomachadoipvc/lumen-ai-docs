@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from lumen.agent.loop import Agent
 from lumen.answers.service import AnswerService
 from lumen.answers.turns import TurnRunner
 from lumen.config import Settings
@@ -26,6 +27,7 @@ class Container:
     worker: IngestionWorker
     chat: ChatProvider
     answers: AnswerService
+    agent: Agent
     turns: TurnRunner
 
     @classmethod
@@ -55,6 +57,14 @@ class Container:
             chat=chat,
             answers=AnswerService(
                 session_factory=sessions, embedder=embedder, chat=chat, settings=settings
+            ),
+            agent=Agent(
+                session_factory=sessions,
+                embedder=embedder,
+                chat=chat,
+                max_steps=settings.agent_max_steps,
+                tool_timeout_s=settings.agent_tool_timeout_s,
+                total_timeout_s=settings.agent_total_timeout_s,
             ),
             turns=TurnRunner(sessions=sessions, settings=settings),
         )
