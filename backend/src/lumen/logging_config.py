@@ -8,6 +8,7 @@ from structlog.typing import Processor
 
 # Loggers that uvicorn configures with its own handlers. We route them through ours instead.
 _UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
+_NOISY_LOGGERS = ("httpx", "httpcore")
 
 
 def configure_logging(level: str = "INFO", *, json: bool = True) -> None:
@@ -49,6 +50,10 @@ def configure_logging(level: str = "INFO", *, json: bool = True) -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(level.upper())
+
+    # HTTP clients used by the provider SDKs log every request at INFO; that is noise here.
+    for name in _NOISY_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
 
     for name in _UVICORN_LOGGERS:
         uvicorn_logger = logging.getLogger(name)
