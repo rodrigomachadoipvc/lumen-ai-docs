@@ -4,6 +4,6 @@ FastAPI backend for Lumen. See the repository root `README.md` for the project o
 
 ```bash
 uv sync
-uv run fastapi dev src/lumen/main.py   # http://localhost:8000/health
+uv run uvicorn lumen.main:app --reload   # http://localhost:8000/health
 uv run pytest
 ```

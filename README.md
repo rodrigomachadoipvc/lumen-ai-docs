@@ -38,7 +38,7 @@ docker compose up -d                 # PostgreSQL + pgvector on localhost:5432
 
 cd backend
 uv sync
-uv run fastapi dev src/lumen/main.py # API on http://localhost:8000 (docs at /docs)
+uv run uvicorn lumen.main:app --reload  # API on http://localhost:8000 (docs at /docs)
 
 cd ../frontend
 pnpm install

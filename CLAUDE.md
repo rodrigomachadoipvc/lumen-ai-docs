@@ -63,7 +63,7 @@ docker compose --profile ollama up -d      # + Ollama container on :11435 (nativ
 docker compose --profile langfuse up -d    # + Langfuse v4 on :3001
 cd backend && uv sync && uv run pytest
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy
-cd backend && uv run fastapi dev src/lumen/main.py   # API on :8000
+cd backend && uv run uvicorn lumen.main:app --reload   # API on :8000
 cd frontend && pnpm install && pnpm dev               # web on :3000
 cd frontend && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test
 pre-commit run --all-files                 # all hooks (install: uv tool install pre-commit)
