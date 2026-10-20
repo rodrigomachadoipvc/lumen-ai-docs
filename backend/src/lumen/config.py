@@ -4,11 +4,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The `chunks.embedding` column is created with this many dimensions (see the first migration).
 EMBEDDING_DIMENSIONS = 1024
+
+# Paths are resolved from the code's location, so commands work from any directory.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+REPO_DIR = BACKEND_DIR.parent
 
 
 class Settings(BaseSettings):
@@ -17,7 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="LUMEN_",
         # Repository-root `.env` (shared with docker compose), then an optional backend override.
-        env_file=("../.env", ".env"),
+        env_file=(REPO_DIR / ".env", BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -34,7 +38,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://lumen:lumen@localhost:5432/lumen"
 
     # --- Uploads --------------------------------------------------------------------
-    upload_dir: Path = Path("../data/uploads")
+    # A relative path is taken relative to backend/.
+    upload_dir: Path = REPO_DIR / "data" / "uploads"
     max_upload_mb: int = Field(default=25, ge=1, le=200)
 
     # --- Chunking (sizes in approximate tokens; 1 token ~ 4 characters) ------------------
@@ -88,6 +93,11 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     openai_api_key: SecretStr | None = None
     anthropic_api_key: SecretStr | None = None
+
+    @field_validator("upload_dir")
+    @classmethod
+    def _resolve_upload_dir(cls, value: Path) -> Path:
+        return value if value.is_absolute() else (BACKEND_DIR / value).resolve()
 
     @property
     def max_upload_bytes(self) -> int:
