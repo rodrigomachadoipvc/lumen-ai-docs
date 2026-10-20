@@ -70,8 +70,8 @@ class Settings(BaseSettings):
     # Passages given to the model for each question.
     answer_passages: int = Field(default=6, ge=1, le=20)
     # Below this cosine similarity for the best passage, Lumen answers "I don't know" without
-    # calling the model (see docs/adr/0005-grounded-answers.md).
-    min_similarity: float = Field(default=0.5, ge=0.0, le=1.0)
+    # calling the model. Tuned with the evals (docs/evals.md, docs/adr/0005-grounded-answers.md).
+    min_similarity: float = Field(default=0.42, ge=0.0, le=1.0)
     # Earlier messages of the chat included for follow-up questions.
     history_messages: int = Field(default=6, ge=0, le=40)
 

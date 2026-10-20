@@ -26,17 +26,13 @@ sources that do not exist are removed. The cited passages are returned with chun
 page, heading path and text. An answer with no valid citation is marked `grounded: false`.
 
 **"I don't know" gate.** If the best cosine similarity among the retrieved passages is below
-`LUMEN_MIN_SIMILARITY` (default **0.5**), Lumen answers "I couldn't find information about that in
-the documents" in the question's language **without calling the model**. The threshold was measured
-on the demo corpus with `qwen3-embedding:0.6b`:
-
-| Questions | Best similarity |
-| --- | --- |
-| 10 answerable by the corpus | 0.607 – 0.839 |
-| 10 unrelated (capital of France, recipes, VAT…) | 0.243 – 0.475 |
-
-0.5 sits in the gap. The model's own "could not find it" instruction is the second line of defence
-for questions that pass the gate but are not answered by the passages.
+`LUMEN_MIN_SIMILARITY`, Lumen answers "I couldn't find information about that in the documents" in
+the question's language, **without calling the model**. The first value, 0.5, was measured on 20
+questions with `qwen3-embedding:0.6b`: answerable questions scored 0.61–0.84 and unrelated ones
+0.24–0.48. The golden dataset (ADR 0008) later showed overlap: two answerable questions scored
+0.44 and 0.49, and one unanswerable question scored 0.51. The default is now **0.42**, so no
+answerable question is refused. The model's own "could not find it" instruction is the second line
+of defence for the few unrelated questions that pass the gate.
 
 **Follow-ups.** The last few messages (`LUMEN_HISTORY_MESSAGES`, default 6) are sent as plain text.
 Retrieval uses the previous user question plus the new one, so "e à sexta-feira?" still finds the
