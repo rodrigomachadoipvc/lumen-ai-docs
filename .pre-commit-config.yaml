@@ -1,0 +1,53 @@
+# Install once with `uv tool install pre-commit && pre-commit install`.
+# Run on everything with `pre-commit run --all-files`.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+        # pnpm 12 writes the lockfile as a multi-document YAML stream.
+        exclude: ^frontend/pnpm-lock\.yaml$
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Keep in sync with the ruff version in backend/uv.lock.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (backend)
+        entry: uv run --directory backend mypy
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: frontend-lint
+        name: eslint (frontend)
+        entry: pnpm --dir frontend lint
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|mjs|mts)$
+        pass_filenames: false
+      - id: frontend-format
+        name: prettier (frontend)
+        entry: pnpm --dir frontend format:check
+        language: system
+        files: ^frontend/
+        pass_filenames: false
