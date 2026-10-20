@@ -1,0 +1,28 @@
+[project]
+name = "lumen"
+version = "0.1.0"
+description = "Lumen API: grounded question answering over your documents"
+readme = "README.md"
+authors = [
+    { name = "Rodrigo Machado", email = "rodrigomachado@ipvc.pt" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.156.1",
+    "pydantic-settings>=2.16.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.3,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.15.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]
