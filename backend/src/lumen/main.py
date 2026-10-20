@@ -7,7 +7,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from lumen.api import documents, health
+from lumen.api import documents, health, search
 from lumen.api.errors import register_error_handlers
 from lumen.config import Settings, get_settings
 from lumen.container import Container
@@ -42,6 +42,7 @@ def create_app(
     register_error_handlers(app)
     app.include_router(health.router)
     app.include_router(documents.router)
+    app.include_router(search.router)
 
     structlog.get_logger(__name__).info("app_created", environment=settings.environment)
     return app
