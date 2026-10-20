@@ -44,6 +44,8 @@ addopts = ["--strict-markers", "--strict-config"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
+# Deprecations coming from our own code should fail the build, not scroll past.
+filterwarnings = ["error::DeprecationWarning:lumen.*", "error::DeprecationWarning:tests.*"]
 
 [tool.ruff]
 line-length = 100
