@@ -1,0 +1,25 @@
+Solar System Notes
+
+These notes summarise basic facts about the Solar System for the Lumen demo.
+
+The Sun is a G-type main-sequence star that contains about 99.8 percent of the total mass of the Solar System. Light from the Sun takes about 8 minutes and 20 seconds to reach Earth.
+
+There are eight planets. In order from the Sun they are Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus and Neptune. The four inner planets are rocky, and the four outer planets are giants.
+
+Mercury is the smallest planet and the closest to the Sun. A year on Mercury lasts 88 Earth days.
+
+Venus is the hottest planet, with an average surface temperature of about 465 degrees Celsius, because its thick carbon dioxide atmosphere traps heat. Venus rotates in the opposite direction to most planets.
+
+Earth is the only planet known to support life. It has one natural satellite, the Moon, which is about 384,400 kilometres away.
+
+Mars is known as the Red Planet because of iron oxide on its surface. It has two small moons, Phobos and Deimos. Olympus Mons on Mars is the tallest known volcano in the Solar System.
+
+Jupiter is the largest planet. Its Great Red Spot is a storm larger than Earth that has been observed for more than 300 years.
+
+Saturn is famous for its bright rings, made mostly of ice particles with some rock and dust. Saturn is less dense than water.
+
+Uranus rotates on its side, with an axial tilt of about 98 degrees, probably because of a large collision long ago.
+
+Neptune is the most distant planet and has the strongest winds measured in the Solar System, reaching more than 2,000 kilometres per hour.
+
+Pluto was classified as a planet until 2006, when the International Astronomical Union reclassified it as a dwarf planet.

@@ -1,21 +1,19 @@
 """Upload, list, inspect and delete documents."""
 
 import asyncio
-import hashlib
 import uuid
 from datetime import datetime
-from pathlib import PurePath
 
 from fastapi import APIRouter, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from lumen.api.deps import ContainerDep, SessionDep
 from lumen.api.errors import AppError, not_found
 from lumen.db.models import Document, DocumentStatus, DocumentType
-from lumen.ingestion.parsing import UnsupportedFileError, detect_type
+from lumen.ingestion.parsing import UnsupportedFileError
+from lumen.ingestion.uploads import DuplicateDocumentError, register_upload
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -44,11 +42,6 @@ class DocumentOut(BaseModel):
     updated_at: datetime
 
 
-def _safe_filename(name: str | None) -> str:
-    cleaned = PurePath((name or "").replace("\\", "/")).name.strip()
-    return (cleaned or "document")[:255]
-
-
 async def _read_limited(file: UploadFile, limit: int) -> bytes:
     data = bytearray()
     while chunk := await file.read(_READ_CHUNK):
@@ -72,42 +65,16 @@ async def upload_document(
     file: UploadFile, session: SessionDep, container: ContainerDep
 ) -> DocumentOut:
     """Store the file and queue it for processing. Poll `GET /documents/{id}` for its status."""
-    filename = _safe_filename(file.filename)
     data = await _read_limited(file, container.settings.max_upload_bytes)
     if not data:
         raise AppError(422, "empty_file", "The file is empty.")
     try:
-        doc_type = detect_type(data, filename)
+        document = await register_upload(session, container.storage, file.filename, data)
     except UnsupportedFileError as exc:
         raise AppError(415, "unsupported_file", str(exc)) from exc
-
-    sha256 = hashlib.sha256(data).hexdigest()
-    existing = await session.scalar(select(Document).where(Document.sha256 == sha256))
-    if existing is not None:
-        raise AppError(
-            409,
-            "duplicate_document",
-            "This file has already been uploaded.",
-            {"document_id": str(existing.id)},
-        )
-
-    document = Document(
-        id=uuid.uuid7(),
-        filename=filename,
-        doc_type=doc_type,
-        size_bytes=len(data),
-        sha256=sha256,
-        status=DocumentStatus.PENDING,
-        chunk_count=0,
-    )
-    await asyncio.to_thread(container.storage.save, document.id, data)
-    session.add(document)
-    try:
-        await session.commit()
-    except IntegrityError as exc:  # the same file uploaded twice at the same moment
-        await asyncio.to_thread(container.storage.delete, document.id)
-        raise AppError(409, "duplicate_document", "This file has already been uploaded.") from exc
-    await session.refresh(document)
+    except DuplicateDocumentError as exc:
+        details = {"document_id": str(exc.existing_id)} if exc.existing_id else None
+        raise AppError(409, "duplicate_document", str(exc), details) from exc
     container.worker.enqueue(document.id)
     return DocumentOut.model_validate(document)
 
