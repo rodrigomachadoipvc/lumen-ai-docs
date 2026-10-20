@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     # Earlier messages of the chat included for follow-up questions.
     history_messages: int = Field(default=6, ge=0, le=40)
 
+    # --- Agent ----------------------------------------------------------------------
+    # Rounds of tool calls before the agent must answer, and time limits in seconds.
+    agent_max_steps: int = Field(default=5, ge=1, le=20)
+    agent_tool_timeout_s: float = Field(default=30.0, gt=0, le=600)
+    agent_total_timeout_s: float = Field(default=300.0, gt=0, le=3600)
+
     # --- Providers ------------------------------------------------------------------
     ollama_base_url: str = "http://localhost:11434"
     openai_api_key: SecretStr | None = None

@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from lumen.answers.service import DeltaEvent, DoneEvent, SourcesEvent, StepEvent
+from lumen.answers.service import DeltaEvent, DoneEvent, ResetEvent, SourcesEvent, StepEvent
 from lumen.answers.turns import DEFAULT_TITLE, AnswerMode, ErrorEvent, SavedEvent, TurnEvent
 from lumen.api.deps import ContainerDep, SessionDep
 from lumen.api.errors import not_found
@@ -133,6 +133,8 @@ def to_sse(event: TurnEvent) -> ServerSentEvent:
             )
         case ErrorEvent(message):
             return ServerSentEvent(event="error", data={"message": message})
+        case ResetEvent():
+            return ServerSentEvent(event="reset", data={})
         case SavedEvent(user_id, assistant_id):
             return ServerSentEvent(
                 event="saved",
@@ -144,10 +146,11 @@ def to_sse(event: TurnEvent) -> ServerSentEvent:
 async def send_message(
     body: MessageCreate, chat: ChatDep, container: ContainerDep
 ) -> AsyncIterator[ServerSentEvent]:
-    """Ask a question. Streams `sources`, `delta`… then `done` and
+    """Ask a question. Streams `sources`, `delta`… (agent mode adds `step` and `reset`), then
+    `done` and
     `saved`; `error` replaces `done` if the model fails. The answer is saved even if the client
     disconnects."""
-    answerer = container.answers.answer_turn
+    answerer = container.agent.run if body.mode == "agent" else container.answers.answer_turn
     queue = container.turns.start(chat.id, body.content.strip(), answerer, body.document_ids)
     while (event := await queue.get()) is not None:
         yield to_sse(event)

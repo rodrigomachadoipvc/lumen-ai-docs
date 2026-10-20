@@ -18,7 +18,7 @@ from lumen.providers.errors import ProviderError
 
 log = structlog.get_logger(__name__)
 
-AnswerMode = Literal["answer"]
+AnswerMode = Literal["answer", "agent"]
 DEFAULT_TITLE = "New chat"
 
 
