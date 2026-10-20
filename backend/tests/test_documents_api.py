@@ -164,3 +164,18 @@ async def test_invalid_id_returns_validation_error(client: AsyncClient) -> None:
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"
+
+
+async def test_list_chunks_by_page_and_heading(client: AsyncClient, container: Container) -> None:
+    document = (await _upload(client, "guia.md", MARKDOWN)).json()
+    await container.worker.join()
+
+    every = (await client.get(f"/documents/{document['id']}/chunks")).json()
+    by_heading = await client.get(
+        f"/documents/{document['id']}/chunks", params={"heading": "citações"}
+    )
+
+    assert [c["ordinal"] for c in every] == [0, 1]
+    assert [c["heading_path"] for c in by_heading.json()] == [["Guia", "Citações"]]
+    missing = await client.get("/documents/01900000-0000-7000-8000-000000000000/chunks")
+    assert missing.status_code == 404

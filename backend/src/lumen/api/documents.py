@@ -3,15 +3,16 @@
 import asyncio
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, UploadFile, status
+from fastapi import APIRouter, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from lumen.api.deps import ContainerDep, SessionDep
 from lumen.api.errors import AppError, not_found
-from lumen.db.models import Document, DocumentStatus, DocumentType
+from lumen.db.models import Chunk, Document, DocumentStatus, DocumentType
 from lumen.ingestion.parsing import UnsupportedFileError
 from lumen.ingestion.uploads import DuplicateDocumentError, register_upload
 
@@ -106,6 +107,37 @@ async def download_document_file(
         content_disposition_type="inline",
         headers={"X-Content-Type-Options": "nosniff"},
     )
+
+
+class ChunkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    ordinal: int
+    page: int | None
+    heading_path: list[str]
+    text: str
+    token_count: int
+
+
+@router.get("/{document_id}/chunks")
+async def list_document_chunks(
+    document_id: uuid.UUID,
+    session: SessionDep,
+    page: Annotated[int | None, Query(ge=1)] = None,
+    heading: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[ChunkOut]:
+    """The document's passages in reading order, optionally only one page or one heading."""
+    await _get_document(session, document_id)
+    statement = select(Chunk).where(Chunk.document_id == document_id)
+    if page is not None:
+        statement = statement.where(Chunk.page == page)
+    if heading is not None:
+        headings = func.array_to_string(Chunk.heading_path, " > ")
+        statement = statement.where(headings.ilike(f"%{heading}%"))
+    chunks = await session.scalars(statement.order_by(Chunk.ordinal).limit(limit))
+    return [ChunkOut.model_validate(c) for c in chunks]
 
 
 @router.post("/{document_id}/reprocess", status_code=status.HTTP_202_ACCEPTED)
