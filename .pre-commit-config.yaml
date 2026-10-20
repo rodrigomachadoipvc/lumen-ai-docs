@@ -39,6 +39,12 @@ repos:
         language: system
         files: ^backend/.*\.py$
         pass_filenames: false
+      - id: mypy-mcp
+        name: mypy (mcp-server)
+        entry: uv run --directory mcp-server mypy
+        language: system
+        files: ^mcp-server/.*\.py$
+        pass_filenames: false
       - id: frontend-lint
         name: eslint (frontend)
         entry: pnpm --dir frontend lint
