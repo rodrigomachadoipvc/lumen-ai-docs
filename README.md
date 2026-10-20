@@ -30,14 +30,17 @@ The design is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and dec
 ## Quick start
 
 Requirements: [Docker](https://docs.docker.com/get-docker/), [uv](https://docs.astral.sh/uv/),
-Node.js 24+ and [pnpm](https://pnpm.io/installation).
+Node.js 24+, [pnpm](https://pnpm.io/installation) and [Ollama](https://ollama.com/download).
 
 ```bash
 cp .env.example .env
 docker compose up -d                 # PostgreSQL + pgvector on localhost:5432
+ollama pull qwen3-embedding:0.6b     # embeddings (639 MB)
 
 cd backend
 uv sync
+uv run alembic upgrade head          # create the tables
+uv run python -m lumen.seed          # optional: load the demo documents in data/samples
 uv run uvicorn lumen.main:app --reload  # API on http://localhost:8000 (docs at /docs)
 
 cd ../frontend

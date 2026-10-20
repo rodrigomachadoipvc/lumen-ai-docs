@@ -63,11 +63,13 @@ docker compose --profile ollama up -d      # + Ollama container on :11435 (nativ
 docker compose --profile langfuse up -d    # + Langfuse v4 on :3001
 cd backend && uv sync && uv run pytest
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy
+cd backend && uv run alembic upgrade head            # migrations (needs docker compose up)
+cd backend && uv run python -m lumen.seed            # load data/samples (needs Ollama models)
+cd backend && uv run python scripts/build_sample_pdf.py   # rebuild the demo PDF from its source
 cd backend && uv run uvicorn lumen.main:app --reload   # API on :8000
 cd frontend && pnpm install && pnpm dev               # web on :3000
 cd frontend && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test
 pre-commit run --all-files                 # all hooks (install: uv tool install pre-commit)
-# From M1: cd backend && uv run alembic upgrade head
 # From M5: cd frontend && pnpm exec playwright test
 ```
 
