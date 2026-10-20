@@ -158,6 +158,41 @@ def _outline_by_page(reader: PdfReader) -> list[tuple[int, tuple[str, ...]]]:
     return sorted(entries, key=lambda entry: entry[0])
 
 
+def _normalize(line: str) -> str:
+    return " ".join(line.split()).casefold()
+
+
+def _pdf_page_blocks(
+    lines: list[str], page: int, heading: tuple[str, ...], titles: dict[str, tuple[str, ...]]
+) -> tuple[list[Block], tuple[str, ...]]:
+    """Split one page into blocks, switching heading wherever a bookmark title appears as a line."""
+    blocks: list[Block] = []
+    current: list[str] = []
+    # A bookmark whose title is not printed on the page applies from the top of that page.
+    line_keys = {_normalize(line) for line in lines}
+    for key in [k for k in titles if k not in line_keys]:
+        heading = titles.pop(key)
+
+    def flush() -> None:
+        if current:
+            blocks.append(
+                Block(text=" ".join(" ".join(current).split()), page=page, heading_path=heading)
+            )
+            current.clear()
+
+    for line in lines:
+        key = _normalize(line)
+        if key in titles:
+            flush()
+            heading = titles.pop(key)
+        elif not key:
+            flush()  # a blank line ends a paragraph
+        else:
+            current.append(line)
+    flush()
+    return blocks, heading
+
+
 def parse_pdf(data: bytes) -> ParsedDocument:
     try:
         reader = PdfReader(io.BytesIO(data))
@@ -166,16 +201,16 @@ def parse_pdf(data: bytes) -> ParsedDocument:
         outline = _outline_by_page(reader)
         blocks: list[Block] = []
         heading: tuple[str, ...] = ()
-        outline_index = 0
+        next_entry = 0
         for page_index, page in enumerate(reader.pages):
-            # The heading in force on a page is the last bookmark that starts on or before it.
-            while outline_index < len(outline) and outline[outline_index][0] <= page_index:
-                heading = outline[outline_index][1]
-                outline_index += 1
-            text = _clean_pdf_text(page.extract_text() or "")
-            for paragraph in _paragraphs(text):
-                text_block = " ".join(paragraph.split())
-                blocks.append(Block(text=text_block, page=page_index + 1, heading_path=heading))
+            titles: dict[str, tuple[str, ...]] = {}
+            while next_entry < len(outline) and outline[next_entry][0] <= page_index:
+                path = outline[next_entry][1]
+                titles.setdefault(_normalize(path[-1]), path)
+                next_entry += 1
+            lines = _clean_pdf_text(page.extract_text() or "").splitlines()
+            page_blocks, heading = _pdf_page_blocks(lines, page_index + 1, heading, titles)
+            blocks.extend(page_blocks)
         page_count = len(reader.pages)
     except ParsingError:
         raise

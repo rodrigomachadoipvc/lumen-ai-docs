@@ -79,3 +79,18 @@ def test_pdf_without_text_fails_clearly() -> None:
 def test_corrupt_pdf_fails_clearly() -> None:
     with pytest.raises(ParsingError):
         parse(b"%PDF-1.4 not really a pdf", DocumentType.PDF)
+
+
+def test_pdf_switches_heading_where_a_bookmark_title_is_printed() -> None:
+    data = make_pdf(
+        [["Chapter A", "Alpha body.", "Chapter B", "Beta body."], ["Still beta."]],
+        outline=[("Chapter A", 0), ("Chapter B", 0)],
+    )
+
+    blocks = parse_pdf(data).blocks
+
+    assert [(b.text, b.page, b.heading_path) for b in blocks] == [
+        ("Alpha body.", 1, ("Chapter A",)),
+        ("Beta body.", 1, ("Chapter B",)),
+        ("Still beta.", 2, ("Chapter B",)),
+    ]
