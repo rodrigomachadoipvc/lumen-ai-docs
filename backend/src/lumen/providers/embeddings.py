@@ -50,7 +50,9 @@ class OllamaEmbeddings:
         for start in range(0, len(texts), self._batch_size):
             batch = list(texts[start : start + self._batch_size])
             try:
-                response = await self._client.embed(model=self._model, input=batch)
+                response = await self._client.embed(
+                    model=self._model, input=batch, keep_alive="30m"
+                )
             except ConnectionError as exc:
                 raise ProviderError(
                     f"Could not reach Ollama at {self._base_url}. Is it running?"

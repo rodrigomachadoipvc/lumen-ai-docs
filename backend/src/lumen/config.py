@@ -50,6 +50,26 @@ class Settings(BaseSettings):
     )
     embedding_batch_size: int = Field(default=16, ge=1, le=256)
 
+    # --- Chat model -----------------------------------------------------------------
+    chat_provider: Literal["ollama", "anthropic", "openai"] = "ollama"
+    # Empty means the provider default: qwen3.5:4b, claude-opus-5-5 or gpt-6-luna.
+    chat_model: str = ""
+    chat_max_tokens: int = Field(default=4096, ge=256, le=64000)
+    # Qwen 3.5 can "think" before answering; off by default because it is slow on a laptop GPU.
+    ollama_think: bool = False
+    # Context window Ollama allocates for chat; question + 6 passages + history fit in 8K.
+    ollama_context_tokens: int = Field(default=8192, ge=2048, le=262144)
+    anthropic_effort: Literal["low", "medium", "high"] = "medium"
+
+    # --- Answers --------------------------------------------------------------------
+    # Passages given to the model for each question.
+    answer_passages: int = Field(default=6, ge=1, le=20)
+    # Below this cosine similarity for the best passage, Lumen answers "I don't know" without
+    # calling the model (see docs/adr/0005-grounded-answers.md).
+    min_similarity: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Earlier messages of the chat included for follow-up questions.
+    history_messages: int = Field(default=6, ge=0, le=40)
+
     # --- Providers ------------------------------------------------------------------
     ollama_base_url: str = "http://localhost:11434"
     openai_api_key: SecretStr | None = None
