@@ -12,6 +12,7 @@ from lumen.api.errors import register_error_handlers
 from lumen.config import Settings, get_settings
 from lumen.container import Container
 from lumen.logging_config import configure_logging
+from lumen.observability import setup_opentelemetry
 from lumen.providers.chat import ChatProvider
 from lumen.providers.embeddings import EmbeddingProvider
 
@@ -44,6 +45,7 @@ def create_app(
         allow_headers=["*"],
     )
     register_error_handlers(app)
+    setup_opentelemetry(app, settings)
     app.include_router(health.router)
     app.include_router(documents.router)
     app.include_router(search.router)

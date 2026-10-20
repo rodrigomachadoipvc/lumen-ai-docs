@@ -27,6 +27,7 @@ from lumen.answers.service import (
     StepEvent,
     not_found_message,
 )
+from lumen.observability import LLMTracer, usage_details
 from lumen.providers.chat import ChatCompletion, ChatMessage, ChatProvider, TextDelta, ToolCall
 from lumen.providers.embeddings import EmbeddingProvider
 from lumen.providers.errors import ProviderError
@@ -76,6 +77,7 @@ class Agent:
         max_steps: int = 5,
         tool_timeout_s: float = 30.0,
         total_timeout_s: float = 300.0,
+        tracer: LLMTracer | None = None,
     ) -> None:
         self._sessions = session_factory
         self._embedder = embedder
@@ -83,6 +85,7 @@ class Agent:
         self._max_steps = max_steps
         self._tool_timeout = tool_timeout_s
         self._total_timeout = total_timeout_s
+        self._tracer = tracer or LLMTracer()
 
     def run(
         self,
@@ -119,16 +122,32 @@ class Agent:
                 messages.append(ChatMessage("user", FINAL_ANSWER_NUDGE))
             completion: ChatCompletion | None = None
             streamed = False
-            async for event in self._chat.stream(
-                messages, system=AGENT_SYSTEM_PROMPT, tools=() if out_of_steps else TOOL_SPECS
-            ):
-                if time.monotonic() > deadline:
-                    raise AgentTimeoutError("The agent took too long to answer.")
-                if isinstance(event, TextDelta):
-                    streamed = True
-                    yield DeltaEvent(event.text)
-                else:
-                    completion = event
+            with self._tracer.observe(
+                f"model-step-{step_number + 1}",
+                as_type="generation",
+                model=self._chat.model,
+                input=[{"role": m.role, "content": m.content} for m in messages],
+            ) as generation:
+                async for event in self._chat.stream(
+                    messages, system=AGENT_SYSTEM_PROMPT, tools=() if out_of_steps else TOOL_SPECS
+                ):
+                    if time.monotonic() > deadline:
+                        raise AgentTimeoutError("The agent took too long to answer.")
+                    if isinstance(event, TextDelta):
+                        streamed = True
+                        yield DeltaEvent(event.text)
+                    else:
+                        completion = event
+                        generation.update(
+                            output={
+                                "text": event.text,
+                                "tool_calls": [
+                                    {"name": c.name, "arguments": c.arguments}
+                                    for c in event.tool_calls
+                                ],
+                            },
+                            usage_details=usage_details(event.usage),
+                        )
             if completion is None:  # pragma: no cover - adapters always end with a completion
                 raise ProviderError("The model returned no completion.")
 
@@ -178,7 +197,9 @@ class Agent:
         error: str | None = None
         result: ToolResult | None = None
         try:
-            result = await asyncio.wait_for(tools.call(call.name, call.arguments), timeout)
+            with self._tracer.observe(call.name, as_type="tool", input=call.arguments) as span:
+                result = await asyncio.wait_for(tools.call(call.name, call.arguments), timeout)
+                span.update(output=result.content)
         except ToolError as exc:
             error = str(exc)
         except TimeoutError:

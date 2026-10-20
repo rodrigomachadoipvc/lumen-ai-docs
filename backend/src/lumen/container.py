@@ -11,6 +11,7 @@ from lumen.config import Settings
 from lumen.db.session import create_engine, create_session_factory
 from lumen.ingestion.pipeline import IngestionService
 from lumen.ingestion.worker import IngestionWorker
+from lumen.observability import LLMTracer, build_llm_tracer
 from lumen.providers.chat import ChatProvider, build_chat_provider
 from lumen.providers.embeddings import EmbeddingProvider, build_embedding_provider
 from lumen.storage import FileStorage
@@ -29,6 +30,7 @@ class Container:
     answers: AnswerService
     agent: Agent
     turns: TurnRunner
+    tracer: LLMTracer
 
     @classmethod
     def build(
@@ -46,6 +48,7 @@ class Container:
             session_factory=sessions, storage=storage, embedder=embedder, settings=settings
         )
         chat = chat or build_chat_provider(settings)
+        tracer = build_llm_tracer(settings)
         return cls(
             settings=settings,
             engine=engine,
@@ -56,7 +59,11 @@ class Container:
             worker=IngestionWorker(ingestion.process),
             chat=chat,
             answers=AnswerService(
-                session_factory=sessions, embedder=embedder, chat=chat, settings=settings
+                session_factory=sessions,
+                embedder=embedder,
+                chat=chat,
+                settings=settings,
+                tracer=tracer,
             ),
             agent=Agent(
                 session_factory=sessions,
@@ -65,8 +72,10 @@ class Container:
                 max_steps=settings.agent_max_steps,
                 tool_timeout_s=settings.agent_tool_timeout_s,
                 total_timeout_s=settings.agent_total_timeout_s,
+                tracer=tracer,
             ),
-            turns=TurnRunner(sessions=sessions, settings=settings),
+            turns=TurnRunner(sessions=sessions, settings=settings, tracer=tracer),
+            tracer=tracer,
         )
 
     async def start(self) -> None:
@@ -77,4 +86,5 @@ class Container:
     async def close(self) -> None:
         await self.turns.wait()
         await self.worker.stop()
+        self.tracer.flush()
         await self.engine.dispose()

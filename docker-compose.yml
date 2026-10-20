@@ -96,6 +96,16 @@ services:
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-dev-secret}
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:${LANGFUSE_MINIO_PORT:-9090}
       LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://langfuse-minio:9000
+      # Headless setup: a ready-made organisation, project, API keys and login (local only).
+      LANGFUSE_INIT_ORG_ID: lumen
+      LANGFUSE_INIT_ORG_NAME: Lumen
+      LANGFUSE_INIT_PROJECT_ID: lumen
+      LANGFUSE_INIT_PROJECT_NAME: Lumen
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LUMEN_LANGFUSE_PUBLIC_KEY:-pk-lf-lumen-local}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LUMEN_LANGFUSE_SECRET_KEY:-sk-lf-lumen-local}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL:-admin@lumen.local}
+      LANGFUSE_INIT_USER_NAME: Lumen admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:-lumen-local-only}
 
   langfuse-clickhouse:
     profiles: [langfuse]

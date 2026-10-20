@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lumen.answers.service import AnswerEvent, DoneEvent
 from lumen.config import Settings
 from lumen.db.models import Chat, Message, MessageRole
+from lumen.observability import LLMTracer
 from lumen.providers.chat import ChatMessage
 from lumen.providers.errors import ProviderError
 
@@ -42,9 +43,16 @@ Answerer = Callable[
 
 
 class TurnRunner:
-    def __init__(self, *, sessions: async_sessionmaker[AsyncSession], settings: Settings) -> None:
+    def __init__(
+        self,
+        *,
+        sessions: async_sessionmaker[AsyncSession],
+        settings: Settings,
+        tracer: LLMTracer | None = None,
+    ) -> None:
         self._sessions = sessions
         self._settings = settings
+        self._tracer = tracer or LLMTracer()
         self._tasks: set[asyncio.Task[None]] = set()
 
     async def history(self, chat_id: uuid.UUID) -> list[ChatMessage]:
@@ -71,9 +79,10 @@ class TurnRunner:
         content: str,
         answerer: Answerer,
         document_ids: Sequence[uuid.UUID] | None,
+        mode: AnswerMode = "answer",
     ) -> asyncio.Queue[TurnEvent | None]:
         queue: asyncio.Queue[TurnEvent | None] = asyncio.Queue()
-        task = asyncio.create_task(self._run(chat_id, content, answerer, document_ids, queue))
+        task = asyncio.create_task(self._run(chat_id, content, answerer, document_ids, mode, queue))
         # Keep a reference so the task is not garbage-collected if the client disconnects.
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -90,6 +99,7 @@ class TurnRunner:
         content: str,
         answerer: Answerer,
         document_ids: Sequence[uuid.UUID] | None,
+        mode: AnswerMode,
         queue: asyncio.Queue[TurnEvent | None],
     ) -> None:
         try:
@@ -107,23 +117,35 @@ class TurnRunner:
             assistant = Message(
                 id=uuid.uuid7(), chat_id=chat_id, role=MessageRole.ASSISTANT, content=""
             )
-            try:
-                async for event in answerer(content, history, document_ids):
-                    await queue.put(event)
-                    if isinstance(event, DoneEvent):
-                        assistant.content = event.answer
-                        assistant.sources = event.sources
-                        assistant.citations = event.citations
-                        assistant.steps = event.steps
-                        assistant.grounded = event.grounded
-                        assistant.model = event.model
-            except ProviderError as exc:
-                assistant.error = str(exc)
-                await queue.put(ErrorEvent(str(exc)))
-            except Exception:
-                log.exception("chat_turn_failed", chat_id=str(chat_id))
-                assistant.error = "Something went wrong while answering."
-                await queue.put(ErrorEvent(assistant.error))
+            with self._tracer.trace(
+                "chat-turn", session_id=str(chat_id), tags=[mode], input=content
+            ) as root:
+                try:
+                    async for event in answerer(content, history, document_ids):
+                        await queue.put(event)
+                        if isinstance(event, DoneEvent):
+                            assistant.content = event.answer
+                            assistant.sources = event.sources
+                            assistant.citations = event.citations
+                            assistant.steps = event.steps
+                            assistant.grounded = event.grounded
+                            assistant.model = event.model
+                except ProviderError as exc:
+                    assistant.error = str(exc)
+                    await queue.put(ErrorEvent(str(exc)))
+                except Exception:
+                    log.exception("chat_turn_failed", chat_id=str(chat_id))
+                    assistant.error = "Something went wrong while answering."
+                    await queue.put(ErrorEvent(assistant.error))
+                root.update(
+                    output=assistant.content or assistant.error,
+                    metadata={
+                        "grounded": assistant.grounded,
+                        "citations": len(assistant.citations or []),
+                        "model": assistant.model,
+                    },
+                    level="ERROR" if assistant.error else None,
+                )
 
             async with self._sessions() as session:
                 session.add(assistant)

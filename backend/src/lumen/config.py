@@ -76,6 +76,14 @@ class Settings(BaseSettings):
     agent_tool_timeout_s: float = Field(default=30.0, gt=0, le=600)
     agent_total_timeout_s: float = Field(default=300.0, gt=0, le=3600)
 
+    # --- Observability (all optional) ---------------------------------------------------
+    # Langfuse LLM traces; the docker compose "langfuse" profile runs it on :3001.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_base_url: str = "http://localhost:3001"
+    # OTLP/HTTP endpoint for API traces and metrics, e.g. http://localhost:4318
+    otel_exporter_endpoint: str | None = None
+
     # --- Providers ------------------------------------------------------------------
     ollama_base_url: str = "http://localhost:11434"
     openai_api_key: SecretStr | None = None
