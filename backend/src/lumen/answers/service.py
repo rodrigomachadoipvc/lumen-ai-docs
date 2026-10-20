@@ -11,6 +11,7 @@ from lumen.answers.citations import citations_for, source_payload, strip_invalid
 from lumen.answers.prompts import NOT_FOUND, SYSTEM_PROMPT, build_question_prompt
 from lumen.config import Settings
 from lumen.ingestion.language import detect_language
+from lumen.observability import LLMTracer, usage_details
 from lumen.providers.chat import ChatCompletion, ChatMessage, ChatProvider, TextDelta
 from lumen.providers.embeddings import EmbeddingProvider
 from lumen.retrieval.search import SearchHit, search
@@ -66,6 +67,20 @@ def has_enough_evidence(hits: Sequence[SearchHit], min_similarity: float) -> boo
     return best >= min_similarity
 
 
+def _hit_summary(hit: SearchHit) -> dict[str, Any]:
+    return {
+        "filename": hit.filename,
+        "page": hit.page,
+        "section": " > ".join(hit.heading_path),
+        "similarity": hit.similarity,
+        "ranks": hit.ranks,
+    }
+
+
+def _as_dicts(messages: Sequence[ChatMessage]) -> list[dict[str, str]]:
+    return [{"role": m.role, "content": m.content} for m in messages]
+
+
 class AnswerService:
     def __init__(
         self,
@@ -74,11 +89,13 @@ class AnswerService:
         embedder: EmbeddingProvider,
         chat: ChatProvider,
         settings: Settings,
+        tracer: LLMTracer | None = None,
     ) -> None:
         self._sessions = session_factory
         self._embedder = embedder
         self._chat = chat
         self._settings = settings
+        self._tracer = tracer or LLMTracer()
 
     async def answer(
         self,
@@ -87,14 +104,17 @@ class AnswerService:
         history: Sequence[ChatMessage] = (),
         document_ids: Sequence[uuid.UUID] | None = None,
     ) -> AsyncIterator[AnswerEvent]:
-        async with self._sessions() as session:
-            hits = await search(
-                session,
-                self._embedder,
-                retrieval_query(question, history),
-                limit=self._settings.answer_passages,
-                document_ids=document_ids,
-            )
+        query = retrieval_query(question, history)
+        with self._tracer.observe("retrieval", as_type="retriever", input=query) as observation:
+            async with self._sessions() as session:
+                hits = await search(
+                    session,
+                    self._embedder,
+                    query,
+                    limit=self._settings.answer_passages,
+                    document_ids=document_ids,
+                )
+            observation.update(output=[_hit_summary(h) for h in hits])
 
         if not hits or not has_enough_evidence(hits, self._settings.min_similarity):
             message = not_found_message(question)
@@ -108,11 +128,18 @@ class AnswerService:
 
         messages = [*history, ChatMessage("user", build_question_prompt(question, hits))]
         final_text = ""
-        async for event in self._chat.stream(messages, system=SYSTEM_PROMPT):
-            if isinstance(event, TextDelta):
-                yield DeltaEvent(event.text)
-            elif isinstance(event, ChatCompletion):
-                final_text = event.text
+        with self._tracer.observe(
+            "answer",
+            as_type="generation",
+            model=self._chat.model,
+            input=[{"role": "system", "content": SYSTEM_PROMPT}, *_as_dicts(messages)],
+        ) as generation:
+            async for event in self._chat.stream(messages, system=SYSTEM_PROMPT):
+                if isinstance(event, TextDelta):
+                    yield DeltaEvent(event.text)
+                elif isinstance(event, ChatCompletion):
+                    final_text = event.text
+                    generation.update(output=event.text, usage_details=usage_details(event.usage))
 
         answer = strip_invalid_markers(final_text, len(hits)) or not_found_message(question)
         citations = citations_for(answer, hits)

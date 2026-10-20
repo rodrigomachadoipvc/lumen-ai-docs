@@ -40,13 +40,16 @@ class SearchHit:
 
 
 def reciprocal_rank_fusion(
-    rankings: Mapping[str, Sequence[uuid.UUID]], k: int = RRF_K
+    rankings: Mapping[str, Sequence[uuid.UUID]],
+    k: int = RRF_K,
+    weights: Mapping[str, float] | None = None,
 ) -> dict[uuid.UUID, float]:
-    """score(d) = Σ 1 / (k + rank_i(d)), with ranks starting at 1, over every list containing d."""
+    """score(d) = Σ w_i / (k + rank_i(d)), ranks starting at 1, over every list containing d."""
     scores: dict[uuid.UUID, float] = {}
-    for ranked_ids in rankings.values():
+    for name, ranked_ids in rankings.items():
+        weight = (weights or {}).get(name, 1.0)
         for rank, item_id in enumerate(ranked_ids, start=1):
-            scores[item_id] = scores.get(item_id, 0.0) + 1.0 / (k + rank)
+            scores[item_id] = scores.get(item_id, 0.0) + weight / (k + rank)
     return scores
 
 
@@ -134,6 +137,7 @@ async def search(
         rankings["vector"] = [chunk_id for chunk_id, _ in vec]
         similarities = dict(vec)
 
+    # Equal weights: the evals showed down-weighting full-text did not help (docs/evals.md).
     fused = reciprocal_rank_fusion(rankings)
     best = sorted(fused, key=lambda chunk_id: (-fused[chunk_id], str(chunk_id)))[:limit]
     if not best:

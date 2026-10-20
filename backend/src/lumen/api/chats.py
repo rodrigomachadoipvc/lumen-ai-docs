@@ -151,6 +151,8 @@ async def send_message(
     `saved`; `error` replaces `done` if the model fails. The answer is saved even if the client
     disconnects."""
     answerer = container.agent.run if body.mode == "agent" else container.answers.answer_turn
-    queue = container.turns.start(chat.id, body.content.strip(), answerer, body.document_ids)
+    queue = container.turns.start(
+        chat.id, body.content.strip(), answerer, body.document_ids, body.mode
+    )
     while (event := await queue.get()) is not None:
         yield to_sse(event)

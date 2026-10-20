@@ -20,6 +20,15 @@ def test_rrf_rewards_items_found_by_both_rankers() -> None:
     assert max(scores, key=scores.__getitem__) == b
 
 
+def test_rrf_weights_scale_each_ranking() -> None:
+    a, b = uuid.uuid4(), uuid.uuid4()
+
+    scores = reciprocal_rank_fusion({"fulltext": [a], "vector": [b]}, weights={"fulltext": 0.5})
+
+    assert scores[a] == pytest.approx(0.5 / (RRF_K + 1))
+    assert scores[b] == pytest.approx(1 / (RRF_K + 1))
+
+
 def test_rrf_of_nothing_is_empty() -> None:
     assert reciprocal_rank_fusion({"fulltext": [], "vector": []}) == {}
 

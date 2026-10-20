@@ -69,9 +69,17 @@ cd backend && uv run python scripts/build_sample_pdf.py   # rebuild the demo PDF
 cd backend && uv run uvicorn lumen.main:app --reload   # API on :8000
 cd frontend && pnpm install && pnpm dev               # web on :3000
 cd frontend && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test
+cd frontend && pnpm build && pnpm test:e2e            # Playwright, API mocked
+cd mcp-server && uv sync && uv run pytest && uv run mypy
+cd mcp-server && uv run lumen-mcp stdio               # MCP server (see docs/mcp.md)
+uv run --project backend python -m evals.run         # retrieval evals (from the repo root)
+uv run --project backend python -m evals.run --answers   # + LLM-judged answers (slow)
+uv run --project backend pytest evals                # unit tests for the eval runner
 pre-commit run --all-files                 # all hooks (install: uv tool install pre-commit)
-# From M5: cd frontend && pnpm exec playwright test
 ```
+
+Scope decisions: this is a local, single-user app. M6 (auth) and M9 (AWS) are intentionally not
+implemented.
 
 ## Rules for code
 
