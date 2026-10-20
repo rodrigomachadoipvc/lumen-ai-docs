@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from typing import Any
@@ -9,6 +10,7 @@ from lumen.answers.citations import cited_numbers, strip_invalid_markers
 from lumen.answers.prompts import SYSTEM_PROMPT, build_question_prompt, format_source
 from lumen.answers.service import DoneEvent, SourcesEvent, retrieval_query
 from lumen.container import Container
+from lumen.db.models import Chat
 from lumen.providers.chat import ChatMessage
 from lumen.providers.errors import ProviderError
 from lumen.retrieval.search import SearchHit
@@ -218,3 +220,20 @@ async def test_message_validation(client: AsyncClient) -> None:
     response = await client.post(f"/chats/{chat_id}/messages", json={"content": ""})
 
     assert response.status_code == 422
+
+
+async def test_waiting_for_turns_returns_right_after_they_finish(
+    container: Container, chat: FakeChat, corpus: None
+) -> None:
+    """Regression: wait() used to spin forever when called as a turn was finishing."""
+    chat.queue("25 days [1].")
+    container.settings.min_similarity = 0.1
+    async with container.sessions() as session:
+        new_chat = Chat(id=uuid.uuid7(), title="t")
+        session.add(new_chat)
+        await session.commit()
+    queue = container.turns.start(new_chat.id, "vacation days", container.answers.answer_turn, None)
+    while await queue.get() is not None:
+        pass
+
+    await asyncio.wait_for(container.turns.wait(), timeout=5)

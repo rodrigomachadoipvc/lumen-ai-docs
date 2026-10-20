@@ -91,7 +91,10 @@ class TurnRunner:
     async def wait(self) -> None:
         """Wait for every running turn (used by tests and on shutdown)."""
         while self._tasks:
-            await asyncio.gather(*list(self._tasks), return_exceptions=True)
+            await asyncio.wait(list(self._tasks))
+            # Awaiting already-finished tasks does not yield to the event loop, so give the
+            # done-callbacks a chance to remove them; otherwise this loop would spin forever.
+            await asyncio.sleep(0)
 
     async def _run(
         self,
