@@ -72,6 +72,58 @@ jobs:
       - name: Pytest
         run: uv run pytest
 
+  evals:
+    name: Retrieval evals (real embeddings)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg18
+        env:
+          POSTGRES_USER: lumen
+          POSTGRES_PASSWORD: lumen
+          POSTGRES_DB: lumen
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lumen" --health-interval 3s --health-timeout 3s
+          --health-retries 20
+      ollama:
+        image: ollama/ollama:0.40.6
+        ports: ["11434:11434"]
+    env:
+      LUMEN_DATABASE_URL: postgresql+asyncpg://lumen:lumen@localhost:5432/lumen
+      LUMEN_OLLAMA_BASE_URL: http://localhost:11434
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          working-directory: backend
+
+      - name: Install dependencies
+        run: uv sync --locked --project backend
+
+      - name: Pull the embedding model
+        run: |
+          curl --retry 10 --retry-connrefused --retry-delay 2 -sf http://localhost:11434/api/version
+          curl -sf http://localhost:11434/api/pull -d '{"model": "qwen3-embedding:0.6b", "stream": false}'
+
+      - name: Unit tests for the eval runner
+        run: uv run --project backend pytest evals -p no:cacheprovider
+
+      - name: Retrieval evals (fail if hybrid hit@5 < 0.90)
+        run: uv run --project backend python -m evals.run --min-hit-at-5 0.90 --output evals-report.json
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eval-report
+          path: evals-report.json
+          retention-days: 30
+
   frontend:
     name: Frontend (lint, types, tests, build)
     runs-on: ubuntu-latest
