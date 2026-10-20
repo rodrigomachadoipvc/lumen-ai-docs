@@ -36,6 +36,7 @@ Node.js 24+, [pnpm](https://pnpm.io/installation) and [Ollama](https://ollama.co
 cp .env.example .env
 docker compose up -d                 # PostgreSQL + pgvector on localhost:5432
 ollama pull qwen3-embedding:0.6b     # embeddings (639 MB)
+ollama pull qwen3.5:4b               # chat model (3.3 GB)
 
 cd backend
 uv sync

@@ -3,9 +3,11 @@
 import hashlib
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from typing import Any
 
 from lumen.config import EMBEDDING_DIMENSIONS
+from lumen.providers.chat import ChatCompletion, ChatEvent, ChatMessage, TextDelta, ToolSpec
 
 _WORD = re.compile(r"\w+", re.UNICODE)
 
@@ -32,3 +34,36 @@ class FakeEmbeddings:
 
     async def embed_query(self, text: str) -> list[float]:
         return hashed_bag_of_words(text)
+
+
+class FakeChat:
+    """Replays scripted completions, streaming each one word by word, and records every call."""
+
+    model = "fake-chat"
+
+    def __init__(self, *completions: ChatCompletion | str) -> None:
+        self.script: list[ChatCompletion] = [
+            c if isinstance(c, ChatCompletion) else ChatCompletion(text=c) for c in completions
+        ]
+        self.calls: list[dict[str, Any]] = []
+        self.error: Exception | None = None
+
+    def queue(self, *completions: ChatCompletion | str) -> None:
+        self.script.extend(
+            c if isinstance(c, ChatCompletion) else ChatCompletion(text=c) for c in completions
+        )
+
+    async def stream(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str,
+        tools: Sequence[ToolSpec] = (),
+    ) -> AsyncIterator[ChatEvent]:
+        self.calls.append({"messages": list(messages), "system": system, "tools": list(tools)})
+        if self.error is not None:
+            raise self.error
+        completion = self.script.pop(0) if self.script else ChatCompletion(text="")
+        for word in completion.text.split(" "):
+            yield TextDelta(word + " ")
+        yield completion
